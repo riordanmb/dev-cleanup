@@ -116,7 +116,7 @@ def main(
         console.print("\n[bold cyan]Default Age Filter[/]")
         new_older_than = inquirer.number(
             message="Default older than (months):",
-            default=config.get("older_than_months", DEFAULT_CONFIG["older_than_months"]),
+            default=int(config.get("older_than_months") or DEFAULT_CONFIG["older_than_months"]),
             min_allowed=0,
         ).execute()
 
@@ -159,7 +159,7 @@ def main(
         console.print("\n[bold cyan]Age Filters[/]")
         older_than_months = inquirer.number(
             message="Show projects older than how many months?",
-            default=config.get("older_than_months", DEFAULT_CONFIG["older_than_months"]),
+            default=int(config.get("older_than_months") or DEFAULT_CONFIG["older_than_months"]),
             min_allowed=0,
         ).execute()
 
@@ -364,7 +364,7 @@ def nuke(
         console.print("\n[bold cyan]Age Filters[/]")
         older_than_months = inquirer.number(
             message="Show projects older than how many months?",
-            default=config.get("older_than_months", DEFAULT_CONFIG["older_than_months"]),
+            default=int(config.get("older_than_months") or DEFAULT_CONFIG["older_than_months"]),
             min_allowed=0,
         ).execute()
 
