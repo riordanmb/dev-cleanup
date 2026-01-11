@@ -3,8 +3,6 @@
 import subprocess
 from pathlib import Path
 
-CLEANABLE_DIR_NAMES = {"node_modules", "venv", ".venv", "env"}
-
 
 def get_directory_size(path: Path) -> int:
     """Get total size of directory in bytes using du command for efficiency.
@@ -29,13 +27,16 @@ def get_directory_size(path: Path) -> int:
         return 0
 
 
-def find_cleanable_directories(project_path: Path) -> list[tuple[Path, str]]:
+def find_cleanable_directories(
+    project_path: Path, cleanable_dirs: set[str]
+) -> list[tuple[Path, str]]:
     """Find all cleanable directories in a project.
 
     Checks root level and one level deep (for monorepos).
 
     Args:
         project_path: Path to the project
+        cleanable_dirs: Set of directory names to look for (e.g., {"node_modules", "venv"})
 
     Returns:
         List of (path, type) tuples where type is the directory name (e.g., "node_modules")
@@ -43,7 +44,7 @@ def find_cleanable_directories(project_path: Path) -> list[tuple[Path, str]]:
     results = []
 
     # Check root level
-    for name in CLEANABLE_DIR_NAMES:
+    for name in cleanable_dirs:
         candidate = project_path / name
         if candidate.is_dir():
             results.append((candidate, name))
@@ -52,7 +53,7 @@ def find_cleanable_directories(project_path: Path) -> list[tuple[Path, str]]:
     try:
         for subdir in project_path.iterdir():
             if subdir.is_dir() and not subdir.name.startswith("."):
-                for name in CLEANABLE_DIR_NAMES:
+                for name in cleanable_dirs:
                     candidate = subdir / name
                     if candidate.is_dir():
                         results.append((candidate, name))

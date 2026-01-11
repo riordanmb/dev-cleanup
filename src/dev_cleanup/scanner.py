@@ -15,6 +15,7 @@ def scan_for_stale_projects(
     roots: list[Path],
     older_than_months: int | None = None,
     younger_than_months: int | None = None,
+    cleanable_dirs: set[str] | None = None,
     console: Console | None = None,
 ) -> ScanResult:
     """Scan root directories for stale projects with cleanable directories.
@@ -23,11 +24,15 @@ def scan_for_stale_projects(
         roots: List of root directories to scan
         older_than_months: Only include projects older than X months
         younger_than_months: Only include projects younger than X months
+        cleanable_dirs: Set of directory names to scan for (e.g., {"node_modules", "venv"})
         console: Optional Rich console for progress updates
 
     Returns:
         ScanResult with all stale projects found
     """
+    # Use default cleanable dirs if not provided
+    if cleanable_dirs is None:
+        cleanable_dirs = {"node_modules", "venv", ".venv", "env"}
     # Calculate cutoff dates
     older_cutoff = None
     younger_cutoff = None
@@ -64,7 +69,7 @@ def scan_for_stale_projects(
                 continue  # Too old
 
             # Find cleanable directories
-            cleanable = find_cleanable_directories(repo_path)
+            cleanable = find_cleanable_directories(repo_path, cleanable_dirs)
             if not cleanable:
                 continue
 
