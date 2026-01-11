@@ -114,11 +114,11 @@ def main(
 
         # Prompt for default older_than
         console.print("\n[bold cyan]Default Age Filter[/]")
-        new_older_than = inquirer.number(
+        new_older_than = int(inquirer.number(
             message="Default older than (months):",
             default=int(config.get("older_than_months") or DEFAULT_CONFIG["older_than_months"]),
             min_allowed=0,
-        ).execute()
+        ).execute())
 
         # Prompt for default cleanable dirs
         console.print("\n[bold cyan]Default Cleanable Directories[/]")
@@ -142,10 +142,10 @@ def main(
             default=[d for d in COMMON_DIRS if d in current_dirs],
         ).execute()
 
-        # Save config
+        # Save config (ensure older_than is int)
         new_config = {
             "roots": new_roots,
-            "older_than_months": new_older_than,
+            "older_than_months": int(new_older_than),
             "cleanable_dirs": new_cleanable_dirs,
         }
         from dev_cleanup.config import save_config
@@ -157,17 +157,17 @@ def main(
     # Interactive prompts if no age filters specified
     if older_than is None and younger_than is None:
         console.print("\n[bold cyan]Age Filters[/]")
-        older_than_months = inquirer.number(
+        older_than_months = int(inquirer.number(
             message="Show projects older than how many months?",
             default=int(config.get("older_than_months") or DEFAULT_CONFIG["older_than_months"]),
             min_allowed=0,
-        ).execute()
+        ).execute())
 
-        younger_prompt = inquirer.number(
+        younger_prompt = int(inquirer.number(
             message="Show projects younger than how many months? (0 for no limit)",
             default=0,
             min_allowed=0,
-        ).execute()
+        ).execute())
         younger_than_months = younger_prompt if younger_prompt > 0 else None
     else:
         # Use whatever the user specified
@@ -362,17 +362,17 @@ def nuke(
     # Interactive prompts for age filters
     if older_than is None and younger_than is None:
         console.print("\n[bold cyan]Age Filters[/]")
-        older_than_months = inquirer.number(
+        older_than_months = int(inquirer.number(
             message="Show projects older than how many months?",
             default=int(config.get("older_than_months") or DEFAULT_CONFIG["older_than_months"]),
             min_allowed=0,
-        ).execute()
+        ).execute())
 
-        younger_prompt = inquirer.number(
+        younger_prompt = int(inquirer.number(
             message="Show projects younger than how many months? (0 for no limit)",
             default=0,
             min_allowed=0,
-        ).execute()
+        ).execute())
         younger_than_months = younger_prompt if younger_prompt > 0 else None
     else:
         older_than_months = older_than
