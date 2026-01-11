@@ -238,10 +238,28 @@ def main(
 
     if not results.stale_projects:
         console.print("\n[green]No stale projects with cleanable directories found![/]")
+        console.print(f"\nScanned {results.total_repos_scanned} repositories")
+        if results.filtered_too_recent > 0:
+            console.print(f"  [dim]→ {results.filtered_too_recent} too recent[/]")
+        if results.filtered_too_old > 0:
+            console.print(f"  [dim]→ {results.filtered_too_old} too old[/]")
+        if results.filtered_no_commits > 0:
+            console.print(f"  [dim]→ {results.filtered_no_commits} with no commits[/]")
+        if results.filtered_no_cleanable > 0:
+            console.print(f"  [dim]→ {results.filtered_no_cleanable} with no cleanable directories[/]")
         raise typer.Exit(0)
 
     # Display results
     console.print(f"\nScanned {results.total_repos_scanned} repositories")
+    if results.filtered_too_recent > 0:
+        console.print(f"  [dim]→ {results.filtered_too_recent} too recent[/]")
+    if results.filtered_too_old > 0:
+        console.print(f"  [dim]→ {results.filtered_too_old} too old[/]")
+    if results.filtered_no_commits > 0:
+        console.print(f"  [dim]→ {results.filtered_no_commits} with no commits[/]")
+    if results.filtered_no_cleanable > 0:
+        console.print(f"  [dim]→ {results.filtered_no_cleanable} with no cleanable directories[/]")
+    console.print(f"  [green]→ {len(results.stale_projects)} stale projects with cleanable directories[/]")
     display_scan_results(console, results)
 
     # Interactive selection using InquirerPy checkboxes

@@ -44,6 +44,12 @@ def scan_for_stale_projects(
     stale_projects = []
     total_repos = 0
 
+    # Filter statistics
+    filtered_too_recent = 0
+    filtered_too_old = 0
+    filtered_no_commits = 0
+    filtered_no_cleanable = 0
+
     for root in roots:
         if not root.exists():
             if console:
@@ -58,26 +64,30 @@ def scan_for_stale_projects(
             commit_info = get_last_commit_info(repo_path)
             if not commit_info:
                 # No commits or error, skip
+                filtered_no_commits += 1
                 continue
 
             last_commit_date, last_commit_message = commit_info
 
             # Check age filters
             if older_cutoff and last_commit_date >= older_cutoff:
+                filtered_too_recent += 1
                 continue  # Too recent
             if younger_cutoff and last_commit_date < younger_cutoff:
+                filtered_too_old += 1
                 continue  # Too old
 
             # Find cleanable directories
             cleanable = find_cleanable_directories(repo_path, cleanable_dirs)
             if not cleanable:
+                filtered_no_cleanable += 1
                 continue
 
             # Build cleanable directory objects with sizes
-            cleanable_dirs = []
+            cleanable_objs = []
             for dir_path, dir_type in cleanable:
                 size = get_directory_size(dir_path)
-                cleanable_dirs.append(
+                cleanable_objs.append(
                     CleanableDirectory(
                         path=dir_path,
                         dir_type=dir_type,
@@ -91,7 +101,7 @@ def scan_for_stale_projects(
                     name=repo_path.name,
                     last_commit_date=last_commit_date,
                     last_commit_message=last_commit_message,
-                    cleanable_dirs=cleanable_dirs,
+                    cleanable_dirs=cleanable_objs,
                 )
             )
 
@@ -100,4 +110,8 @@ def scan_for_stale_projects(
         total_repos_scanned=total_repos,
         older_than_months=older_than_months,
         younger_than_months=younger_than_months,
+        filtered_too_recent=filtered_too_recent,
+        filtered_too_old=filtered_too_old,
+        filtered_no_commits=filtered_no_commits,
+        filtered_no_cleanable=filtered_no_cleanable,
     )

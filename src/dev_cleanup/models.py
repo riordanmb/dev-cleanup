@@ -48,6 +48,11 @@ class ScanResult:
     total_repos_scanned: int
     older_than_months: int | None = None
     younger_than_months: int | None = None
+    # Filter statistics
+    filtered_too_recent: int = 0
+    filtered_too_old: int = 0
+    filtered_no_commits: int = 0
+    filtered_no_cleanable: int = 0
 
 
 def format_size(bytes_size: int) -> str:

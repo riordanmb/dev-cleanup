@@ -30,9 +30,7 @@ def get_directory_size(path: Path) -> int:
 def find_cleanable_directories(
     project_path: Path, cleanable_dirs: set[str]
 ) -> list[tuple[Path, str]]:
-    """Find all cleanable directories in a project.
-
-    Checks root level and one level deep (for monorepos).
+    """Find all cleanable directories in a project at any depth.
 
     Args:
         project_path: Path to the project
@@ -43,24 +41,20 @@ def find_cleanable_directories(
     """
     results = []
 
-    # Check root level
-    for name in cleanable_dirs:
-        candidate = project_path / name
-        if candidate.is_dir():
-            results.append((candidate, name))
+    def scan(path: Path) -> None:
+        """Recursively scan for cleanable directories."""
+        try:
+            for item in path.iterdir():
+                if item.is_dir():
+                    if item.name in cleanable_dirs:
+                        results.append((item, item.name))
+                        # Don't recurse into cleanable dirs (they have nested node_modules etc)
+                    elif not item.name.startswith("."):
+                        scan(item)
+        except PermissionError:
+            pass
 
-    # Check one level deep (for monorepos/workspaces)
-    try:
-        for subdir in project_path.iterdir():
-            if subdir.is_dir() and not subdir.name.startswith("."):
-                for name in cleanable_dirs:
-                    candidate = subdir / name
-                    if candidate.is_dir():
-                        results.append((candidate, name))
-    except PermissionError:
-        # Skip if we can't read the directory
-        pass
-
+    scan(project_path)
     return results
 
 
