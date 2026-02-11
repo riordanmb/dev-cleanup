@@ -48,6 +48,7 @@ class ScanResult:
     total_repos_scanned: int
     older_than_months: int | None = None
     younger_than_months: int | None = None
+    ignored_repos: list[dict] = field(default_factory=list)
     # Filter statistics
     filtered_too_recent: int = 0
     filtered_too_old: int = 0

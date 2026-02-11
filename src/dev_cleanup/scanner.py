@@ -17,6 +17,7 @@ def scan_for_stale_projects(
     younger_than_months: int | None = None,
     cleanable_dirs: set[str] | None = None,
     console: Console | None = None,
+    debug: bool = False,
 ) -> ScanResult:
     """Scan root directories for stale projects with cleanable directories.
 
@@ -42,6 +43,7 @@ def scan_for_stale_projects(
     if younger_than_months is not None:
         younger_cutoff = datetime.now() - relativedelta(months=younger_than_months)
     stale_projects = []
+    ignored_repos: list[dict] = []
     total_repos = 0
 
     # Filter statistics
@@ -65,6 +67,14 @@ def scan_for_stale_projects(
             if not commit_info:
                 # No commits or error, skip
                 filtered_no_commits += 1
+                if debug:
+                    ignored_repos.append(
+                        {
+                            "path": repo_path,
+                            "reason": "no commits",
+                            "last_commit_date": None,
+                        }
+                    )
                 continue
 
             last_commit_date, last_commit_message = commit_info
@@ -72,15 +82,39 @@ def scan_for_stale_projects(
             # Check age filters
             if older_cutoff and last_commit_date >= older_cutoff:
                 filtered_too_recent += 1
+                if debug:
+                    ignored_repos.append(
+                        {
+                            "path": repo_path,
+                            "reason": "too recent",
+                            "last_commit_date": last_commit_date,
+                        }
+                    )
                 continue  # Too recent
             if younger_cutoff and last_commit_date < younger_cutoff:
                 filtered_too_old += 1
+                if debug:
+                    ignored_repos.append(
+                        {
+                            "path": repo_path,
+                            "reason": "too old",
+                            "last_commit_date": last_commit_date,
+                        }
+                    )
                 continue  # Too old
 
             # Find cleanable directories
             cleanable = find_cleanable_directories(repo_path, cleanable_dirs)
             if not cleanable:
                 filtered_no_cleanable += 1
+                if debug:
+                    ignored_repos.append(
+                        {
+                            "path": repo_path,
+                            "reason": "no cleanable directories",
+                            "last_commit_date": last_commit_date,
+                        }
+                    )
                 continue
 
             # Build cleanable directory objects with sizes
@@ -110,6 +144,7 @@ def scan_for_stale_projects(
         total_repos_scanned=total_repos,
         older_than_months=older_than_months,
         younger_than_months=younger_than_months,
+        ignored_repos=ignored_repos,
         filtered_too_recent=filtered_too_recent,
         filtered_too_old=filtered_too_old,
         filtered_no_commits=filtered_no_commits,

@@ -64,6 +64,12 @@ def main(
         "-e",
         help="Actually delete selected directories (default: dry run)",
     ),
+    debug: bool = typer.Option(
+        False,
+        "--debug",
+        "-d",
+        help="Show ignored repositories and reasons",
+    ),
     setup: bool = typer.Option(
         False,
         "--setup",
@@ -234,7 +240,20 @@ def main(
             younger_than_months=younger_than_months,
             cleanable_dirs=cleanable_dirs,
             console=console,
+            debug=debug,
         )
+
+    if debug and results.ignored_repos:
+        console.print("\n[bold cyan]Ignored Repositories (debug)[/]")
+        for ignored in results.ignored_repos:
+            last_commit = ignored["last_commit_date"]
+            last_commit_text = (
+                last_commit.strftime("%Y-%m-%d") if last_commit else "n/a"
+            )
+            console.print(
+                f"  [dim]→[/] {ignored['path']} "
+                f"[yellow]({ignored['reason']}, last commit: {last_commit_text})[/]"
+            )
 
     if not results.stale_projects:
         console.print("\n[green]No stale projects with cleanable directories found![/]")

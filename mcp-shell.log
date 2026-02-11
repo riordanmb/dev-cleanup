@@ -1,0 +1,7 @@
+{"level":"info","message":"MCP Shell Server started","timestamp":"2026-01-11T21:55:24.737Z"}
+{"level":"info","message":"Shell: /bin/zsh","timestamp":"2026-01-11T21:55:24.739Z"}
+{"level":"info","message":"Working Directory: /Users/michaelriordan2","timestamp":"2026-01-11T21:55:24.739Z"}
+{"level":"info","message":"Platform: darwin","timestamp":"2026-01-11T21:55:24.739Z"}
+{"level":"info","message":"Hostname: Michaels-MacBook-Pro-26.local","timestamp":"2026-01-11T21:55:24.739Z"}
+{"level":"info","message":"Username: michaelriordan2","timestamp":"2026-01-11T21:55:24.740Z"}
+{"level":"info","message":"MCP Shell Server ready","timestamp":"2026-01-11T21:55:24.741Z"}

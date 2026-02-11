@@ -7,7 +7,8 @@ from pathlib import Path
 
 def is_git_repo(path: Path) -> bool:
     """Check if path is a git repository."""
-    return (path / ".git").is_dir()
+    git_path = path / ".git"
+    return git_path.is_dir() or git_path.is_file()
 
 
 def get_last_commit_info(repo_path: Path) -> tuple[datetime, str] | None:
@@ -107,9 +108,12 @@ def find_git_repos(root: Path) -> list[Path]:
             # Not a git repo, scan subdirectories
             for item in path.iterdir():
                 if item.is_dir():
-                    # Skip hidden directories except we'll check them for .git
-                    if not item.name.startswith("."):
-                        scan_directory(item)
+                    if item.name.startswith("."):
+                        # Hidden folders can still be repos; don't recurse into them.
+                        if is_git_repo(item):
+                            repos.append(item)
+                        continue
+                    scan_directory(item)
         except (PermissionError, OSError):
             # Skip directories we can't read
             pass
