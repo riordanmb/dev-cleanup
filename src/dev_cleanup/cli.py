@@ -156,8 +156,10 @@ def main(
         current_dirs = config.get("cleanable_dirs", DEFAULT_CONFIG["cleanable_dirs"])
         new_cleanable_dirs = inquirer.checkbox(
             message="Select default directories to clean:",
-            choices=COMMON_DIRS,
-            default=[d for d in COMMON_DIRS if d in current_dirs],
+            choices=[
+                Choice(value=d, name=d, enabled=d in current_dirs)
+                for d in COMMON_DIRS
+            ],
         ).execute()
 
         # Save config (ensure older_than is int)
@@ -218,9 +220,12 @@ def main(
         default_dirs = config.get("cleanable_dirs", DEFAULT_CONFIG["cleanable_dirs"])
 
         selected_dirs = inquirer.checkbox(
-            message="Select directories to clean:",
-            choices=COMMON_DIRS,
-            default=[d for d in COMMON_DIRS if d in default_dirs],
+            message="Select directories to clean (space to toggle, enter to confirm):",
+            choices=[
+                Choice(value=d, name=d, enabled=d in default_dirs)
+                for d in COMMON_DIRS
+            ],
+            instruction="(Use arrow keys to navigate, space to deselect, enter to confirm)",
         ).execute()
 
         if not selected_dirs:
