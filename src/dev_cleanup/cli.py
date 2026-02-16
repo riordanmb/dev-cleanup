@@ -75,6 +75,12 @@ def main(
         "--setup",
         help="Run configuration wizard to set defaults",
     ),
+    headless: bool = typer.Option(
+        False,
+        "--headless",
+        "--non-interactive",
+        help="Non-interactive mode for automation (uses config defaults, selects all projects)",
+    ),
 ) -> None:
     """Find stale git repositories and clean up their dependency directories.
 
@@ -100,6 +106,12 @@ def main(
 
     # Load config and apply CLI overrides
     config = load_config()
+
+    if headless:
+        console.print("[dim]Running in headless (non-interactive) mode[/]")
+        if setup:
+            console.print("[red]Error: --setup cannot be used with --headless[/]")
+            raise typer.Exit(1)
 
     # Setup wizard
     if setup:
@@ -162,50 +174,58 @@ def main(
 
     # Interactive prompts if no age filters specified
     if older_than is None and younger_than is None:
-        console.print("\n[bold cyan]Age Filters[/]")
-        older_than_months = int(inquirer.number(
-            message="Show projects older than how many months?",
-            default=int(config.get("older_than_months") or DEFAULT_CONFIG["older_than_months"]),
-            min_allowed=0,
-        ).execute())
+        if headless:
+            older_than_months = config.get("older_than_months", DEFAULT_CONFIG["older_than_months"])
+            younger_than_months = None
+        else:
+            console.print("\n[bold cyan]Age Filters[/]")
+            older_than_months = int(inquirer.number(
+                message="Show projects older than how many months?",
+                default=int(config.get("older_than_months") or DEFAULT_CONFIG["older_than_months"]),
+                min_allowed=0,
+            ).execute())
 
-        younger_prompt = int(inquirer.number(
-            message="Show projects younger than how many months? (0 for no limit)",
-            default=0,
-            min_allowed=0,
-        ).execute())
-        younger_than_months = younger_prompt if younger_prompt > 0 else None
+            younger_prompt = int(inquirer.number(
+                message="Show projects younger than how many months? (0 for no limit)",
+                default=0,
+                min_allowed=0,
+            ).execute())
+            younger_than_months = younger_prompt if younger_prompt > 0 else None
     else:
         # Use whatever the user specified
         older_than_months = older_than
         younger_than_months = younger_than
 
-    # Interactive prompt for cleanable directories
-    console.print("\n[bold cyan]Cleanable Directories[/]")
-    COMMON_DIRS = [
-        "node_modules",
-        "venv",
-        ".venv",
-        "env",
-        "target",
-        ".next",
-        "dist",
-        "build",
-        "__pycache__",
-        ".pytest_cache",
-        ".tox",
-    ]
-    default_dirs = config.get("cleanable_dirs", DEFAULT_CONFIG["cleanable_dirs"])
+    # Cleanable directories selection
+    if headless:
+        selected_dirs = config.get("cleanable_dirs", DEFAULT_CONFIG["cleanable_dirs"])
+        console.print(f"\n[dim]Using configured cleanable directories: {', '.join(selected_dirs)}[/]")
+    else:
+        console.print("\n[bold cyan]Cleanable Directories[/]")
+        COMMON_DIRS = [
+            "node_modules",
+            "venv",
+            ".venv",
+            "env",
+            "target",
+            ".next",
+            "dist",
+            "build",
+            "__pycache__",
+            ".pytest_cache",
+            ".tox",
+        ]
+        default_dirs = config.get("cleanable_dirs", DEFAULT_CONFIG["cleanable_dirs"])
 
-    selected_dirs = inquirer.checkbox(
-        message="Select directories to clean:",
-        choices=COMMON_DIRS,
-        default=[d for d in COMMON_DIRS if d in default_dirs],
-    ).execute()
+        selected_dirs = inquirer.checkbox(
+            message="Select directories to clean:",
+            choices=COMMON_DIRS,
+            default=[d for d in COMMON_DIRS if d in default_dirs],
+        ).execute()
 
-    if not selected_dirs:
-        console.print("[red]No directories selected. Exiting.[/]")
-        raise typer.Exit(1)
+        if not selected_dirs:
+            console.print("[red]No directories selected. Exiting.[/]")
+            raise typer.Exit(1)
 
     cleanable_dirs = set(selected_dirs)
 
@@ -281,26 +301,31 @@ def main(
     console.print(f"  [green]→ {len(results.stale_projects)} stale projects with cleanable directories[/]")
     display_scan_results(console, results)
 
-    # Interactive selection using InquirerPy checkboxes
-    choices = [
-        Choice(
-            value=project,
-            name=f"{project.name} - {format_size(project.total_size_bytes)} "
-            f"({', '.join(d.dir_type for d in project.cleanable_dirs)})",
-        )
-        for project in results.stale_projects
-    ]
+    # Project selection
+    if headless:
+        selected = list(results.stale_projects)
+        console.print(f"\n[dim]Auto-selected all {len(selected)} projects[/]")
+    else:
+        choices = [
+            Choice(
+                value=project,
+                name=f"{project.name} - {format_size(project.total_size_bytes)} "
+                f"({', '.join(d.dir_type for d in project.cleanable_dirs)})",
+                enabled=True,
+            )
+            for project in results.stale_projects
+        ]
 
-    console.print("\n")
-    selected = inquirer.checkbox(
-        message="Select projects to clean (space to toggle, enter to confirm):",
-        choices=choices,
-        instruction="(Use arrow keys to navigate, space to select, enter to confirm)",
-    ).execute()
+        console.print("\n")
+        selected = inquirer.checkbox(
+            message="Select projects to clean (space to toggle, enter to confirm):",
+            choices=choices,
+            instruction="(Use arrow keys to navigate, space to deselect, enter to confirm)",
+        ).execute()
 
-    if not selected:
-        console.print("\n[yellow]No projects selected. Exiting.[/]")
-        raise typer.Exit(0)
+        if not selected:
+            console.print("\n[yellow]No projects selected. Exiting.[/]")
+            raise typer.Exit(0)
 
     # Show summary
     display_deletion_summary(console, selected, execute=False)
@@ -309,13 +334,21 @@ def main(
     console.print(f"\n[bold]Total to reclaim:[/] {format_size(total_to_delete)}")
 
     if not execute:
-        console.print("\n[yellow]This was a dry run. Use --execute to actually delete.[/]")
-        raise typer.Exit(0)
-
-    # Confirm before executing
-    if not Confirm.ask("\n[bold red]Proceed with deletion?[/]"):
-        console.print("[yellow]Cancelled.[/]")
-        raise typer.Exit(0)
+        if headless:
+            console.print("\n[yellow]Dry run complete. Use --execute to actually delete.[/]")
+            raise typer.Exit(0)
+        else:
+            console.print("\n[yellow]This was a dry run.[/]")
+            if not Confirm.ask("\n[bold]Would you like to proceed with deletion?[/]"):
+                console.print("[yellow]Exiting without changes.[/]")
+                raise typer.Exit(0)
+    else:
+        if headless:
+            console.print("\n[bold]Proceeding with deletion (headless mode)...[/]")
+        else:
+            if not Confirm.ask("\n[bold red]Proceed with deletion?[/]"):
+                console.print("[yellow]Cancelled.[/]")
+                raise typer.Exit(0)
 
     # Execute deletion
     console.print("\n[bold]Cleaning up...[/]")
@@ -381,6 +414,12 @@ def nuke(
         "-e",
         help="Actually delete projects (default: dry run)",
     ),
+    headless: bool = typer.Option(
+        False,
+        "--headless",
+        "--non-interactive",
+        help="Non-interactive mode for automation (uses config defaults, selects all projects)",
+    ),
 ) -> None:
     """Delete entire stale projects (DESTRUCTIVE).
 
@@ -396,21 +435,28 @@ def nuke(
     """
     config = load_config()
 
-    # Interactive prompts for age filters
-    if older_than is None and younger_than is None:
-        console.print("\n[bold cyan]Age Filters[/]")
-        older_than_months = int(inquirer.number(
-            message="Show projects older than how many months?",
-            default=int(config.get("older_than_months") or DEFAULT_CONFIG["older_than_months"]),
-            min_allowed=0,
-        ).execute())
+    if headless:
+        console.print("[dim]Running in headless (non-interactive) mode[/]")
 
-        younger_prompt = int(inquirer.number(
-            message="Show projects younger than how many months? (0 for no limit)",
-            default=0,
-            min_allowed=0,
-        ).execute())
-        younger_than_months = younger_prompt if younger_prompt > 0 else None
+    # Age filter prompts
+    if older_than is None and younger_than is None:
+        if headless:
+            older_than_months = config.get("older_than_months", DEFAULT_CONFIG["older_than_months"])
+            younger_than_months = None
+        else:
+            console.print("\n[bold cyan]Age Filters[/]")
+            older_than_months = int(inquirer.number(
+                message="Show projects older than how many months?",
+                default=int(config.get("older_than_months") or DEFAULT_CONFIG["older_than_months"]),
+                min_allowed=0,
+            ).execute())
+
+            younger_prompt = int(inquirer.number(
+                message="Show projects younger than how many months? (0 for no limit)",
+                default=0,
+                min_allowed=0,
+            ).execute())
+            younger_than_months = younger_prompt if younger_prompt > 0 else None
     else:
         older_than_months = older_than
         younger_than_months = younger_than
@@ -520,26 +566,31 @@ def nuke(
 
     console.print(table)
 
-    # Interactive selection
-    choices = [
-        Choice(
-            value=project,
-            name=f"{project['name']} - {project['days_stale']} days stale"
-            + (f" - {project['github_remote']}" if github and project['github_remote'] else ""),
-        )
-        for project in stale_projects
-    ]
+    # Project selection
+    if headless:
+        selected = list(stale_projects)
+        console.print(f"\n[dim]Auto-selected all {len(selected)} projects[/]")
+    else:
+        choices = [
+            Choice(
+                value=project,
+                name=f"{project['name']} - {project['days_stale']} days stale"
+                + (f" - {project['github_remote']}" if github and project['github_remote'] else ""),
+                enabled=True,
+            )
+            for project in stale_projects
+        ]
 
-    console.print("\n")
-    selected = inquirer.checkbox(
-        message="[bold red]Select projects to DELETE ENTIRELY:[/]",
-        choices=choices,
-        instruction="(Use arrow keys to navigate, space to select, enter to confirm)",
-    ).execute()
+        console.print("\n")
+        selected = inquirer.checkbox(
+            message="[bold red]Select projects to DELETE ENTIRELY:[/]",
+            choices=choices,
+            instruction="(Use arrow keys to navigate, space to deselect, enter to confirm)",
+        ).execute()
 
-    if not selected:
-        console.print("\n[yellow]No projects selected. Exiting.[/]")
-        raise typer.Exit(0)
+        if not selected:
+            console.print("\n[yellow]No projects selected. Exiting.[/]")
+            raise typer.Exit(0)
 
     # Show what will be deleted
     console.print("\n[bold red]Projects to be deleted:[/]")
@@ -549,24 +600,33 @@ def nuke(
             console.print(f"    [magenta]GitHub: {project['github_remote']}[/]")
 
     if not execute:
-        console.print("\n[yellow]This was a dry run. Use --execute to actually delete.[/]")
-        raise typer.Exit(0)
+        if headless:
+            console.print("\n[yellow]Dry run complete. Use --execute to actually delete.[/]")
+            raise typer.Exit(0)
+        else:
+            console.print("\n[yellow]This was a dry run.[/]")
+            if not Confirm.ask("\n[bold]Would you like to proceed with deletion?[/]"):
+                console.print("[yellow]Exiting without changes.[/]")
+                raise typer.Exit(0)
 
-    # Multiple confirmations
-    console.print("\n[bold red]⚠️  WARNING ⚠️[/]")
-    console.print("[red]This will permanently delete entire project directories![/]")
+    # Multiple confirmations (skipped in headless mode -- user explicitly opted in with --execute)
+    if not headless:
+        console.print("\n[bold red]⚠️  WARNING ⚠️[/]")
+        console.print("[red]This will permanently delete entire project directories![/]")
 
-    if not Confirm.ask(f"\n[bold]Delete {len(selected)} local projects?[/]"):
-        console.print("[yellow]Cancelled.[/]")
-        raise typer.Exit(0)
+        if not Confirm.ask(f"\n[bold]Delete {len(selected)} local projects?[/]"):
+            console.print("[yellow]Cancelled.[/]")
+            raise typer.Exit(0)
 
-    if github:
-        github_projects = [p for p in selected if p['github_remote']]
-        if github_projects and not Confirm.ask(
-            f"\n[bold red]Also delete {len(github_projects)} repositories from GitHub? THIS CANNOT BE UNDONE![/]"
-        ):
-            console.print("[yellow]Skipping GitHub deletion.[/]")
-            github = False
+        if github:
+            github_projects = [p for p in selected if p['github_remote']]
+            if github_projects and not Confirm.ask(
+                f"\n[bold red]Also delete {len(github_projects)} repositories from GitHub? THIS CANNOT BE UNDONE![/]"
+            ):
+                console.print("[yellow]Skipping GitHub deletion.[/]")
+                github = False
+    else:
+        console.print("\n[bold]Proceeding with deletion (headless mode)...[/]")
 
     # Execute deletion
     console.print("\n[bold red]Deleting projects...[/]")
